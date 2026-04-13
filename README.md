@@ -3,6 +3,8 @@
 Publicolio is a zero-config GitHub portfolio generator.
 It lets you fetch a GitHub profile, select repositories, style the page with theme controls, and generate a shareable link.
 
+![Animated Demo](demo.gif)
+
 ## What It Does
 
 - Fetches profile and repo data from GitHub.
