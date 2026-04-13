@@ -30,6 +30,11 @@ Publicolio is a high-end, editorial-grade portfolio generator for developers. It
 
 ## Change Log
 
+### 2026-04-13 — GitHub Repository Initialized and Pushed
+- Initialized local git repository with `main` branch and pushed project to `https://github.com/nishal21/Publicolio.git`.
+- Added `.env` and `.env.*` to `.gitignore`, kept `.env.example` tracked, and removed local `.env` from version control before push.
+- Confirmed branch tracking is set (`origin/main`) and working tree is clean after push.
+
 ### 2026-04-13 — README Domain Instructions Generalized
 - Replaced personal domain examples in README with template domains (`app.example.com` and `short.example.com`).
 - Clarified DNS target for GitHub Pages custom domain must be `nishal21.github.io` (no `/Publicolio` path).
