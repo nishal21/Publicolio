@@ -24,6 +24,9 @@ import {
   Grid3X3,
   ChevronDown,
   ChevronUp,
+  Star,
+  GitFork,
+  Heart,
 } from 'lucide-react';
 
 export const THEMES = {
@@ -89,6 +92,9 @@ const optionButton = (active: boolean): React.CSSProperties => ({
 type ShortLinkDomainChoice = 'auto' | 'workers' | 'custom';
 
 const BUILDER_STORAGE_KEY = 'publicolio.builderState.v1';
+const SUPPORT_REPO_URL = 'https://github.com/nishal21/Publicolio';
+const SUPPORT_STAR_URL = SUPPORT_REPO_URL;
+const SUPPORT_FORK_URL = `${SUPPORT_REPO_URL}/fork`;
 
 interface PersistedBuilderState {
   username?: string;
@@ -96,6 +102,7 @@ interface PersistedBuilderState {
   shortLinkDomain?: ShortLinkDomainChoice;
   themeOptions?: ThemeOptions;
   lastShortUrl?: string;
+  supportPromptDismissed?: boolean;
   repoSelectionsByUser?: Record<string, string[]>;
   cachedProfilesByUser?: Record<string, DeveloperProfile>;
 }
@@ -243,6 +250,7 @@ const loadPersistedBuilderState = (): PersistedBuilderState => {
       shortLinkDomain,
       themeOptions: sanitizeThemeOptions(parsed.themeOptions),
       lastShortUrl: sanitizeShortUrl(parsed.lastShortUrl),
+      supportPromptDismissed: typeof parsed.supportPromptDismissed === 'boolean' ? parsed.supportPromptDismissed : undefined,
       repoSelectionsByUser: sanitizeRepoSelectionsByUser(parsed.repoSelectionsByUser),
       cachedProfilesByUser: sanitizeCachedProfilesByUser(parsed.cachedProfilesByUser),
     };
@@ -309,6 +317,10 @@ export const LandingBuilder: React.FC = () => {
   const [showEditorControls, setShowEditorControls] = useState(false);
   const [themeOptions, setThemeOptions] = useState<ThemeOptions>(
     persistedState.themeOptions ?? DEFAULT_THEME_OPTIONS
+  );
+  const [showSupportPrompt, setShowSupportPrompt] = useState(false);
+  const [supportPromptDismissed, setSupportPromptDismissed] = useState(
+    persistedState.supportPromptDismissed ?? false
   );
   const [repoSelectionsByUser, setRepoSelectionsByUser] = useState<Record<string, string[]>>(
     persistedState.repoSelectionsByUser ?? {}
@@ -409,10 +421,11 @@ export const LandingBuilder: React.FC = () => {
       shortLinkDomain,
       themeOptions,
       lastShortUrl: shortUrl,
+      supportPromptDismissed,
       repoSelectionsByUser,
       cachedProfilesByUser,
     });
-  }, [username, selectedTheme, shortLinkDomain, themeOptions, shortUrl, repoSelectionsByUser, cachedProfilesByUser]);
+  }, [username, selectedTheme, shortLinkDomain, themeOptions, shortUrl, supportPromptDismissed, repoSelectionsByUser, cachedProfilesByUser]);
 
   useEffect(() => {
     if (!profile) return;
@@ -451,10 +464,32 @@ export const LandingBuilder: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const copyUrlWithAlert = async (url: string) => {
+  useEffect(() => {
+    if (!showSupportPrompt) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setShowSupportPrompt(false);
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [showSupportPrompt]);
+
+  const copyUrlWithAlert = async (url: string, showSupportPromptAfterCopy = false) => {
+    const maybeShowSupportPrompt = () => {
+      if (showSupportPromptAfterCopy && !supportPromptDismissed) {
+        window.setTimeout(() => {
+          setShowSupportPrompt(true);
+        }, 160);
+      }
+    };
+
     try {
       await navigator.clipboard.writeText(url);
       window.alert('Link copied');
+      maybeShowSupportPrompt();
       return;
     } catch {
       // Fallback for environments where Clipboard API is unavailable.
@@ -468,6 +503,7 @@ export const LandingBuilder: React.FC = () => {
       try {
         document.execCommand('copy');
         window.alert('Link copied');
+        maybeShowSupportPrompt();
       } catch {
         window.alert('Link generated, but copy failed. Please copy manually.');
       } finally {
@@ -500,7 +536,7 @@ export const LandingBuilder: React.FC = () => {
         existingShortUrl: mode === 'update' ? shortUrl : undefined,
       });
       setShortUrl(generatedUrl);
-      await copyUrlWithAlert(generatedUrl);
+      await copyUrlWithAlert(generatedUrl, mode === 'create');
     } catch (err) {
       if (err instanceof Error && err.message === SHORT_URL_UPDATE_UNSUPPORTED_ERROR) {
         setError('Your shortener worker does not support updating an existing short link yet. Click Reset to create a new link, or enable slug updates in the worker.');
@@ -1231,6 +1267,239 @@ export const LandingBuilder: React.FC = () => {
           `,
         }}
       />
+
+      {showSupportPrompt && !supportPromptDismissed && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 200,
+            background: 'rgba(3,3,5,0.72)',
+            backdropFilter: 'blur(6px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px',
+            animation: 'supportOverlayIn 220ms ease-out',
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Support Publicolio"
+            style={{
+              width: 'min(520px, 100%)',
+              borderRadius: '16px',
+              border: `1px solid ${C.border}`,
+              background: 'linear-gradient(155deg, #151521 0%, #11111a 54%, #0c0c12 100%)',
+              boxShadow: '0 30px 70px rgba(0,0,0,0.6)',
+              padding: '22px',
+              position: 'relative',
+              overflow: 'hidden',
+              animation: 'supportModalIn 460ms cubic-bezier(0.2, 0.9, 0.3, 1) both',
+            }}
+          >
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: '3px',
+                background: 'linear-gradient(90deg, #818cf8 0%, #f472b6 40%, #34d399 80%, #818cf8 100%)',
+                backgroundSize: '220% 100%',
+                animation: 'supportShimmer 3.8s linear infinite',
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                width: '210px',
+                height: '210px',
+                borderRadius: '999px',
+                top: '-88px',
+                right: '-64px',
+                background: 'radial-gradient(circle at center, rgba(129,140,248,0.32) 0%, rgba(129,140,248,0.1) 45%, transparent 70%)',
+                animation: 'supportFloatA 8s ease-in-out infinite',
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                width: '210px',
+                height: '210px',
+                borderRadius: '999px',
+                bottom: '-110px',
+                left: '-76px',
+                background: 'radial-gradient(circle at center, rgba(52,211,153,0.24) 0%, rgba(52,211,153,0.08) 44%, transparent 70%)',
+                animation: 'supportFloatB 9s ease-in-out infinite',
+              }}
+            />
+
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              <p
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  fontSize: '10px',
+                  fontWeight: 800,
+                  color: '#a5b4fc',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.11em',
+                  marginBottom: '10px',
+                  background: 'rgba(129,140,248,0.13)',
+                  border: '1px solid rgba(129,140,248,0.24)',
+                  borderRadius: '999px',
+                  padding: '4px 10px',
+                  animation: 'supportFadeSlide 360ms ease 80ms both',
+                }}
+              >
+                <Heart style={{ width: '12px', height: '12px' }} />
+                Community Support
+              </p>
+
+              <h3
+                style={{
+                  fontSize: '22px',
+                  fontWeight: 800,
+                  color: '#fff',
+                  letterSpacing: '-0.03em',
+                  margin: 0,
+                  animation: 'supportFadeSlide 360ms ease 140ms both',
+                }}
+              >
+                Portfolio published successfully
+              </h3>
+              <p
+                style={{
+                  fontSize: '13px',
+                  color: '#a1a1aa',
+                  marginTop: '8px',
+                  marginBottom: '16px',
+                  lineHeight: 1.55,
+                  animation: 'supportFadeSlide 360ms ease 200ms both',
+                }}
+              >
+                If Publicolio helped you ship fast, supporting with a star or fork helps the project grow.
+              </p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <a
+                href={SUPPORT_STAR_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  textDecoration: 'none',
+                  borderRadius: '10px',
+                  border: `1px solid ${C.accentBorder}`,
+                  background: C.accentBg,
+                  color: '#c7d2fe',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  padding: '10px 12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'flex-start',
+                  gap: '4px',
+                  animation: 'supportFadeSlide 360ms ease 260ms both',
+                }}
+              >
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <Star style={{ width: '13px', height: '13px' }} />
+                  Star on GitHub
+                </span>
+                <span style={{ fontSize: '11px', color: '#a5b4fc', opacity: 0.9 }}>One click, big support</span>
+              </a>
+              <a
+                href={SUPPORT_FORK_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  textDecoration: 'none',
+                  borderRadius: '10px',
+                  border: `1px solid ${C.border}`,
+                  background: 'rgba(255,255,255,0.03)',
+                  color: '#e4e4e7',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  padding: '10px 12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'flex-start',
+                  gap: '4px',
+                  animation: 'supportFadeSlide 360ms ease 320ms both',
+                }}
+              >
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <GitFork style={{ width: '13px', height: '13px' }} />
+                  Fork Repository
+                </span>
+                <span style={{ fontSize: '11px', color: '#a1a1aa', opacity: 0.95 }}>Build your own version</span>
+              </a>
+
+              </div>
+
+              <div
+                style={{
+                  marginTop: '12px',
+                  border: `1px solid rgba(255,255,255,0.08)`,
+                  background: 'rgba(255,255,255,0.02)',
+                  borderRadius: '10px',
+                  padding: '9px 10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  animation: 'supportFadeSlide 360ms ease 380ms both',
+                }}
+              >
+                <Sparkles style={{ width: '13px', height: '13px', color: '#8b5cf6', flexShrink: 0 }} />
+                <span style={{ fontSize: '11px', color: '#a1a1aa', lineHeight: 1.5 }}>
+                  Tip: press Esc anytime to close this popup.
+                </span>
+              </div>
+
+              <div style={{ marginTop: '14px', display: 'flex', gap: '10px', justifyContent: 'flex-end', animation: 'supportFadeSlide 360ms ease 440ms both' }}>
+                <button
+                  onClick={() => setShowSupportPrompt(false)}
+                  style={{
+                    borderRadius: '9px',
+                    border: `1px solid ${C.border}`,
+                    background: 'transparent',
+                    color: '#a1a1aa',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    padding: '9px 12px',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  Maybe later
+                </button>
+                <button
+                  onClick={() => {
+                    setSupportPromptDismissed(true);
+                    setShowSupportPrompt(false);
+                  }}
+                  style={{
+                    borderRadius: '9px',
+                    border: `1px solid ${C.border}`,
+                    background: 'rgba(255,255,255,0.03)',
+                    color: '#e4e4e7',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    padding: '9px 12px',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  Don&apos;t show again
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -30,6 +30,19 @@ Publicolio is a high-end, editorial-grade portfolio generator for developers. It
 
 ## Change Log
 
+### 2026-04-13 — Post-Deploy Support Popup (Star/Fork + Permanent Skip)
+- Added a post-copy support modal that appears after successful deploy link copy.
+- Modal includes direct actions for GitHub Star and Fork.
+- Added `Maybe later` and `Don't show again` actions.
+- Persisted permanent skip preference in builder local storage so users can opt out permanently.
+
+### 2026-04-13 — Support Popup Redesign (Motion + Premium UI)
+- Redesigned support modal with layered visual effects, animated entry, and staggered content reveals.
+- Added decorative gradient shimmer bar and ambient floating glow elements for richer presentation.
+- Improved CTA clarity with icon-led Star/Fork cards and helper copy.
+- Added keyboard support: `Esc` closes the support popup.
+- Adjusted trigger behavior so popup appears on new deploy flow, not on update-link flow.
+
 ### 2026-04-13 — README Professional Documentation Pass
 - Rewrote `README.md` into a production-grade open-source format with clearer structure and wording.
 - Added cleaner sections for runtime model, end-to-end flow, deployment checklist, and operations contracts.
