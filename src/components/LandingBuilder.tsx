@@ -1,5 +1,9 @@
-import React, { useMemo, useRef, useState } from 'react';
-import { fetchDeveloperData, generateShortUrl } from '../services/api';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  fetchDeveloperData,
+  generateShortUrl,
+  SHORT_URL_UPDATE_UNSUPPORTED_ERROR,
+} from '../services/api';
 import type { DeveloperProfile } from '../types';
 import { LiquidGlass } from './themes/LiquidGlass.tsx';
 import { BentoGrid } from './themes/BentoGrid.tsx';
@@ -84,6 +88,178 @@ const optionButton = (active: boolean): React.CSSProperties => ({
 
 type ShortLinkDomainChoice = 'auto' | 'workers' | 'custom';
 
+const BUILDER_STORAGE_KEY = 'publicolio.builderState.v1';
+
+interface PersistedBuilderState {
+  username?: string;
+  selectedTheme?: keyof typeof THEMES;
+  shortLinkDomain?: ShortLinkDomainChoice;
+  themeOptions?: ThemeOptions;
+  lastShortUrl?: string;
+  repoSelectionsByUser?: Record<string, string[]>;
+  cachedProfilesByUser?: Record<string, DeveloperProfile>;
+}
+
+const isObjectRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const sanitizeThemeOptions = (value: unknown): ThemeOptions => {
+  if (!isObjectRecord(value)) return DEFAULT_THEME_OPTIONS;
+
+  const options = value as Partial<ThemeOptions>;
+  const accentColor =
+    typeof options.accentColor === 'string' && /^#[0-9A-Fa-f]{6}$/.test(options.accentColor)
+      ? options.accentColor
+      : DEFAULT_THEME_OPTIONS.accentColor;
+
+  return {
+    showStats: typeof options.showStats === 'boolean' ? options.showStats : DEFAULT_THEME_OPTIONS.showStats,
+    showAvatar: typeof options.showAvatar === 'boolean' ? options.showAvatar : DEFAULT_THEME_OPTIONS.showAvatar,
+    showBio: typeof options.showBio === 'boolean' ? options.showBio : DEFAULT_THEME_OPTIONS.showBio,
+    accentColor,
+    layout: options.layout === 'compact' || options.layout === 'comfortable' ? options.layout : DEFAULT_THEME_OPTIONS.layout,
+    repoSort: options.repoSort === 'featured' || options.repoSort === 'stars' || options.repoSort === 'name' ? options.repoSort : DEFAULT_THEME_OPTIONS.repoSort,
+    cardStyle: options.cardStyle === 'soft' || options.cardStyle === 'sharp' ? options.cardStyle : DEFAULT_THEME_OPTIONS.cardStyle,
+    textScale: options.textScale === 'sm' || options.textScale === 'md' || options.textScale === 'lg' ? options.textScale : DEFAULT_THEME_OPTIONS.textScale,
+  };
+};
+
+const sanitizeRepoSelectionsByUser = (value: unknown): Record<string, string[]> => {
+  if (!isObjectRecord(value)) return {};
+
+  const cleaned: Record<string, string[]> = {};
+  Object.entries(value).forEach(([username, repos]) => {
+    if (!Array.isArray(repos)) return;
+    const unique = Array.from(
+      new Set(repos.filter((repo): repo is string => typeof repo === 'string' && repo.trim().length > 0))
+    );
+    if (unique.length > 0) {
+      cleaned[username.toLowerCase()] = unique;
+    }
+  });
+  return cleaned;
+};
+
+const sanitizeProject = (value: unknown): DeveloperProfile['projects'][number] | null => {
+  if (!isObjectRecord(value)) return null;
+
+  const name = typeof value.name === 'string' ? value.name : '';
+  const url = typeof value.url === 'string' ? value.url : '';
+  if (!name || !url) return null;
+
+  return {
+    name,
+    description: typeof value.description === 'string' ? value.description : '',
+    url,
+    stars: typeof value.stars === 'number' && Number.isFinite(value.stars) ? value.stars : 0,
+    language: typeof value.language === 'string' && value.language.trim().length > 0 ? value.language : 'Unknown',
+  };
+};
+
+const sanitizeDeveloperProfile = (value: unknown): DeveloperProfile | undefined => {
+  if (!isObjectRecord(value)) return undefined;
+
+  const username = typeof value.username === 'string' ? value.username : '';
+  if (!username) return undefined;
+
+  const rawProjects = Array.isArray(value.projects) ? value.projects : [];
+  const projects = rawProjects
+    .map(project => sanitizeProject(project))
+    .filter((project): project is DeveloperProfile['projects'][number] => Boolean(project));
+
+  return {
+    username,
+    name: typeof value.name === 'string' && value.name.trim().length > 0 ? value.name : username,
+    avatarUrl: typeof value.avatarUrl === 'string' ? value.avatarUrl : '',
+    bio: typeof value.bio === 'string' && value.bio.trim().length > 0 ? value.bio : 'Developer',
+    projects,
+  };
+};
+
+const sanitizeCachedProfilesByUser = (value: unknown): Record<string, DeveloperProfile> => {
+  if (!isObjectRecord(value)) return {};
+
+  const cleaned: Record<string, DeveloperProfile> = {};
+  Object.entries(value).forEach(([username, profile]) => {
+    const normalized = sanitizeDeveloperProfile(profile);
+    if (!normalized) return;
+    cleaned[username.toLowerCase()] = normalized;
+  });
+  return cleaned;
+};
+
+const sanitizeShortUrl = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
+const areProfilesEquivalent = (a?: DeveloperProfile, b?: DeveloperProfile): boolean => {
+  if (!a || !b) return false;
+  if (a.username !== b.username || a.name !== b.name || a.avatarUrl !== b.avatarUrl || a.bio !== b.bio) {
+    return false;
+  }
+  if (a.projects.length !== b.projects.length) return false;
+
+  for (let i = 0; i < a.projects.length; i += 1) {
+    const ap = a.projects[i];
+    const bp = b.projects[i];
+    if (
+      ap.name !== bp.name ||
+      ap.description !== bp.description ||
+      ap.url !== bp.url ||
+      ap.stars !== bp.stars ||
+      ap.language !== bp.language
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
+const loadPersistedBuilderState = (): PersistedBuilderState => {
+  if (typeof window === 'undefined') return {};
+
+  try {
+    const raw = window.localStorage.getItem(BUILDER_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    if (!isObjectRecord(parsed)) return {};
+
+    const selectedTheme =
+      typeof parsed.selectedTheme === 'string' && parsed.selectedTheme in THEMES
+        ? (parsed.selectedTheme as keyof typeof THEMES)
+        : undefined;
+
+    const shortLinkDomain =
+      parsed.shortLinkDomain === 'auto' || parsed.shortLinkDomain === 'workers' || parsed.shortLinkDomain === 'custom'
+        ? parsed.shortLinkDomain
+        : undefined;
+
+    return {
+      username: typeof parsed.username === 'string' ? parsed.username : undefined,
+      selectedTheme,
+      shortLinkDomain,
+      themeOptions: sanitizeThemeOptions(parsed.themeOptions),
+      lastShortUrl: sanitizeShortUrl(parsed.lastShortUrl),
+      repoSelectionsByUser: sanitizeRepoSelectionsByUser(parsed.repoSelectionsByUser),
+      cachedProfilesByUser: sanitizeCachedProfilesByUser(parsed.cachedProfilesByUser),
+    };
+  } catch {
+    return {};
+  }
+};
+
+const persistBuilderState = (state: PersistedBuilderState) => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(BUILDER_STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Ignore storage quota and private mode exceptions.
+  }
+};
+
 const resolveHostname = (value?: string): string => {
   if (!value) return '';
   const raw = value.trim();
@@ -98,19 +274,48 @@ const resolveHostname = (value?: string): string => {
 };
 
 export const LandingBuilder: React.FC = () => {
-  const [username, setUsername] = useState('');
-  const [selectedTheme, setSelectedTheme] = useState<keyof typeof THEMES>('aurora');
-  const [profile, setProfile] = useState<DeveloperProfile | null>(null);
-  const [selectedRepos, setSelectedRepos] = useState<Set<string>>(new Set());
+  const [persistedState] = useState<PersistedBuilderState>(() => loadPersistedBuilderState());
+  const initialUsername = persistedState.username?.trim() ?? '';
+  const initialUserKey = initialUsername.toLowerCase();
+  const initialCachedProfile = persistedState.cachedProfilesByUser?.[initialUserKey] ?? null;
+  const initialSavedSelection = initialCachedProfile
+    ? persistedState.repoSelectionsByUser?.[initialCachedProfile.username.toLowerCase()] ?? []
+    : [];
+  const initialSelectedRepos = initialCachedProfile
+    ? (() => {
+        const availableRepos = new Set(initialCachedProfile.projects.map(project => project.name));
+        const restoredSelection = initialSavedSelection.filter(repoName => availableRepos.has(repoName));
+        return restoredSelection.length > 0
+          ? restoredSelection
+          : initialCachedProfile.projects.map(project => project.name);
+      })()
+    : [];
+
+  const [username, setUsername] = useState(initialUsername);
+  const [selectedTheme, setSelectedTheme] = useState<keyof typeof THEMES>(
+    persistedState.selectedTheme ?? 'aurora'
+  );
+  const [profile, setProfile] = useState<DeveloperProfile | null>(initialCachedProfile);
+  const [selectedRepos, setSelectedRepos] = useState<Set<string>>(new Set(initialSelectedRepos));
   const [loading, setLoading] = useState(false);
   const [deploying, setDeploying] = useState(false);
   const [error, setError] = useState('');
-  const [shortUrl, setShortUrl] = useState('');
+  const [shortUrl, setShortUrl] = useState(persistedState.lastShortUrl ?? '');
   const [repoSearch, setRepoSearch] = useState('');
   const [customToken, setCustomToken] = useState('');
-  const [shortLinkDomain, setShortLinkDomain] = useState<ShortLinkDomainChoice>('auto');
+  const [shortLinkDomain, setShortLinkDomain] = useState<ShortLinkDomainChoice>(
+    persistedState.shortLinkDomain ?? 'auto'
+  );
   const [showEditorControls, setShowEditorControls] = useState(false);
-  const [themeOptions, setThemeOptions] = useState<ThemeOptions>(DEFAULT_THEME_OPTIONS);
+  const [themeOptions, setThemeOptions] = useState<ThemeOptions>(
+    persistedState.themeOptions ?? DEFAULT_THEME_OPTIONS
+  );
+  const [repoSelectionsByUser, setRepoSelectionsByUser] = useState<Record<string, string[]>>(
+    persistedState.repoSelectionsByUser ?? {}
+  );
+  const [cachedProfilesByUser, setCachedProfilesByUser] = useState<Record<string, DeveloperProfile>>(
+    persistedState.cachedProfilesByUser ?? {}
+  );
   const previewScrollRef = useRef<HTMLDivElement>(null);
 
   const shortenerEndpoint = import.meta.env.VITE_SHORTENER_URL || import.meta.env.VITE_SHORTENER_API_URL || '';
@@ -141,22 +346,49 @@ export const LandingBuilder: React.FC = () => {
     setThemeOptions(prev => ({ ...prev, [key]: value }));
   };
 
-  const fetchProfile = async () => {
-    if (!username.trim()) return;
-    setLoading(true);
-    setError('');
-    setProfile(null);
-    setRepoSearch('');
-    scrollPreviewToTop();
+  const applyProfileWithSavedSelection = (data: DeveloperProfile) => {
+    setProfile(data);
+
+    const userKey = data.username.toLowerCase();
+    const savedSelection = repoSelectionsByUser[userKey] ?? [];
+    const availableRepos = new Set(data.projects.map(project => project.name));
+    const restoredSelection = savedSelection.filter(repoName => availableRepos.has(repoName));
+
+    setSelectedRepos(new Set(restoredSelection.length > 0 ? restoredSelection : data.projects.map(project => project.name)));
+  };
+
+  const fetchProfile = async (mode: 'manual' | 'background' = 'manual') => {
+    const targetUsername = username.trim();
+    if (!targetUsername) return;
+
+    if (mode === 'manual') {
+      setLoading(true);
+      setError('');
+      if (profile && profile.username.toLowerCase() !== targetUsername.toLowerCase()) {
+        setShortUrl('');
+      }
+      setProfile(null);
+      setRepoSearch('');
+      scrollPreviewToTop();
+    }
+
     try {
-      const data = await fetchDeveloperData(username.trim(), customToken.trim() || undefined);
-      setProfile(data);
-      setSelectedRepos(new Set(data.projects.map(p => p.name)));
-      requestAnimationFrame(scrollPreviewToTop);
+      const data = await fetchDeveloperData(
+        targetUsername,
+        mode === 'manual' ? customToken.trim() || undefined : undefined
+      );
+      applyProfileWithSavedSelection(data);
+      if (mode === 'manual') {
+        requestAnimationFrame(scrollPreviewToTop);
+      }
     } catch {
-      setError("Couldn't fetch this GitHub profile. Check username/token and try again.");
+      if (mode === 'manual') {
+        setError("Couldn't fetch this GitHub profile. Check username/token and try again.");
+      }
     } finally {
-      setLoading(false);
+      if (mode === 'manual') {
+        setLoading(false);
+      }
     }
   };
 
@@ -169,6 +401,55 @@ export const LandingBuilder: React.FC = () => {
 
   const selectAll = () => profile && setSelectedRepos(new Set(filteredRepos.map(p => p.name)));
   const selectNone = () => setSelectedRepos(new Set());
+
+  useEffect(() => {
+    persistBuilderState({
+      username,
+      selectedTheme,
+      shortLinkDomain,
+      themeOptions,
+      lastShortUrl: shortUrl,
+      repoSelectionsByUser,
+      cachedProfilesByUser,
+    });
+  }, [username, selectedTheme, shortLinkDomain, themeOptions, shortUrl, repoSelectionsByUser, cachedProfilesByUser]);
+
+  useEffect(() => {
+    if (!profile) return;
+
+    const userKey = profile.username.toLowerCase();
+    const nextSelection = Array.from(selectedRepos);
+
+    setRepoSelectionsByUser(prev => {
+      const current = prev[userKey] ?? [];
+      if (current.length === nextSelection.length && current.every((name, index) => name === nextSelection[index])) {
+        return prev;
+      }
+      return { ...prev, [userKey]: nextSelection };
+    });
+  }, [profile, selectedRepos]);
+
+  useEffect(() => {
+    if (!profile) return;
+
+    const userKey = profile.username.toLowerCase();
+    setCachedProfilesByUser(prev => {
+      const current = prev[userKey];
+      if (areProfilesEquivalent(current, profile)) {
+        return prev;
+      }
+      return { ...prev, [userKey]: profile };
+    });
+  }, [profile]);
+
+  useEffect(() => {
+    if (!initialUsername || !initialCachedProfile) return;
+
+    // Refresh cached profile in background so returning users can see newly created repos without manual reset flow.
+    void fetchProfile('background');
+    // Intentionally run only once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const copyUrlWithAlert = async (url: string) => {
     try {
@@ -195,7 +476,7 @@ export const LandingBuilder: React.FC = () => {
     }
   };
 
-  const handleDeploy = async () => {
+  const handleDeploy = async (mode: 'create' | 'update' = 'create') => {
     if (!profile || selectedRepos.size === 0) return;
     setDeploying(true);
     setError('');
@@ -215,11 +496,17 @@ export const LandingBuilder: React.FC = () => {
       });
       const generatedUrl = await generateShortUrl(`${window.location.origin}/?${params}`, {
         preferredDomain: selectedShortDomain || undefined,
+        preserveSlug: mode === 'update',
+        existingShortUrl: mode === 'update' ? shortUrl : undefined,
       });
       setShortUrl(generatedUrl);
       await copyUrlWithAlert(generatedUrl);
-    } catch {
-      setError('Deploy failed unexpectedly.');
+    } catch (err) {
+      if (err instanceof Error && err.message === SHORT_URL_UPDATE_UNSUPPORTED_ERROR) {
+        setError('Your shortener worker does not support updating an existing short link yet. Click Reset to create a new link, or enable slug updates in the worker.');
+      } else {
+        setError('Deploy failed unexpectedly.');
+      }
     } finally {
       setDeploying(false);
     }
@@ -283,7 +570,9 @@ export const LandingBuilder: React.FC = () => {
                 onKeyDown={e => e.key === 'Enter' && fetchProfile()}
               />
               <button
-                onClick={fetchProfile}
+                onClick={() => {
+                  void fetchProfile('manual');
+                }}
                 disabled={loading || !username.trim()}
                 style={{
                   flexShrink: 0,
@@ -775,7 +1064,7 @@ export const LandingBuilder: React.FC = () => {
               </div>
               <div style={{ marginTop: '10px', display: 'flex', gap: '8px' }}>
                 <button
-                  onClick={handleDeploy}
+                  onClick={() => handleDeploy('update')}
                   disabled={deploying || !profile || selectedRepos.size === 0}
                   style={{
                     flex: 1,
@@ -826,7 +1115,7 @@ export const LandingBuilder: React.FC = () => {
             </div>
           ) : (
             <button
-              onClick={handleDeploy}
+              onClick={() => handleDeploy('create')}
               disabled={!profile || selectedRepos.size === 0 || deploying}
               style={{
                 width: '100%',

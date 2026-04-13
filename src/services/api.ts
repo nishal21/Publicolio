@@ -9,7 +9,11 @@ interface FetchOptions {
 
 interface ShortUrlOptions {
   preferredDomain?: string;
+  preserveSlug?: boolean;
+  existingShortUrl?: string;
 }
+
+export const SHORT_URL_UPDATE_UNSUPPORTED_ERROR = 'SHORT_URL_UPDATE_UNSUPPORTED_ERROR';
 
 const isGithubApiUrl = (url: string): boolean => url.includes('api.github.com');
 
@@ -118,6 +122,19 @@ const applyPreferredShortDomain = (url: string, preferredDomain?: string): strin
   }
 };
 
+const extractShortCode = (url?: string): string | undefined => {
+  if (!url) return undefined;
+
+  try {
+    const parsed = new URL(url, 'https://publicolio.local');
+    const segments = parsed.pathname.split('/').filter(Boolean);
+    if (segments.length !== 1) return undefined;
+    return segments[0];
+  } catch {
+    return undefined;
+  }
+};
+
 export async function fetchDeveloperData(username: string, customToken?: string): Promise<DeveloperProfile> {
   const normalizedUsername = username.trim();
   const normalizedToken = customToken?.trim() || undefined;
@@ -175,9 +192,19 @@ export async function fetchDeveloperData(username: string, customToken?: string)
 }
 
 export async function generateShortUrl(originalUrl: string, options: ShortUrlOptions = {}): Promise<string> {
-  const { preferredDomain } = options;
+  const { preferredDomain, preserveSlug = false, existingShortUrl } = options;
   const shortenerUrl = import.meta.env.VITE_SHORTENER_URL || import.meta.env.VITE_SHORTENER_API_URL;
+
+  const requestedShortCode = preserveSlug ? extractShortCode(existingShortUrl) : undefined;
+
+  if (preserveSlug && !requestedShortCode) {
+    throw new Error(SHORT_URL_UPDATE_UNSUPPORTED_ERROR);
+  }
+
   if (!shortenerUrl) {
+    if (preserveSlug) {
+      throw new Error(SHORT_URL_UPDATE_UNSUPPORTED_ERROR);
+    }
     console.warn('VITE_SHORTENER_URL (or VITE_SHORTENER_API_URL) is missing! Returning original URL for local testing.');
     return originalUrl;
   }
@@ -189,7 +216,14 @@ export async function generateShortUrl(originalUrl: string, options: ShortUrlOpt
         'Content-Type': 'application/json',
       },
       // Send both keys for compatibility with different worker payload contracts.
-      body: JSON.stringify({ longUrl: originalUrl, url: originalUrl }),
+      // For update flow, include existing short code hints so compatible workers can overwrite the same slug.
+      body: JSON.stringify({
+        longUrl: originalUrl,
+        url: originalUrl,
+        shortCode: requestedShortCode,
+        code: requestedShortCode,
+        slug: requestedShortCode,
+      }),
     });
 
     if (!response.ok) {
@@ -201,8 +235,21 @@ export async function generateShortUrl(originalUrl: string, options: ShortUrlOpt
     if (typeof candidate !== 'string' || !candidate.trim()) {
       return originalUrl;
     }
-    return applyPreferredShortDomain(candidate, preferredDomain);
+
+    const normalizedCandidate = applyPreferredShortDomain(candidate, preferredDomain);
+
+    if (requestedShortCode) {
+      const returnedCode = extractShortCode(normalizedCandidate);
+      if (!returnedCode || returnedCode.toLowerCase() !== requestedShortCode.toLowerCase()) {
+        throw new Error(SHORT_URL_UPDATE_UNSUPPORTED_ERROR);
+      }
+    }
+
+    return normalizedCandidate;
   } catch (err) {
+    if (requestedShortCode) {
+      throw err;
+    }
     console.error('Error generating short URL, falling back to original URL:', err);
     return originalUrl;
   }

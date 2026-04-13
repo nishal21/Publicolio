@@ -30,6 +30,19 @@ Publicolio is a high-end, editorial-grade portfolio generator for developers. It
 
 ## Change Log
 
+### 2026-04-13 — Same-Link Update Flow With Backend Capability Check
+- Updated deploy service to support `preserveSlug` mode when user clicks `Update Link`.
+- Frontend now sends existing short code hints (`shortCode`, `code`, `slug`) to shortener worker during update.
+- Added explicit guard: if backend returns a different slug, UI now shows a clear error instead of silently generating a new link.
+- `Deploy Portfolio` still creates new links as normal; `Update Link` now enforces same-link behavior.
+
+### 2026-04-13 — Returning User Builder Cache
+- Added local cache for builder preferences in `localStorage` (`username`, selected theme, theme options, short-link domain mode).
+- Added persistence for last generated `shortUrl` so returning users can continue with the same link flow after refresh.
+- Added cached profile snapshot restoration so returning users see repos/themes/link panel immediately after reload (not just username).
+- Added per-user repository selection memory and restore logic so previous repo picks are kept when data is fetched again.
+- Cache intentionally excludes GitHub token for safety.
+
 ### 2026-04-13 — Added Update Link Action In Deployed State
 - Added an `Update Link` button to the deployed-link panel so users can regenerate a link after editing theme/repo settings without clicking reset first.
 - Kept `Reset` as a secondary action and improved deployed-state controls for faster iteration.
