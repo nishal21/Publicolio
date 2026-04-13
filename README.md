@@ -258,7 +258,7 @@ The project now ships with technical SEO and GEO essentials:
 - `public/robots.txt` includes sitemap reference and explicit allowance for key AI crawlers.
 - `public/sitemap.xml` includes your canonical homepage URL.
 - `public/llms.txt` provides machine-readable guidance for LLM crawlers and AI search tools.
-- `public/og-cover.svg` provides social preview media for sharing.
+- `public/og-cover.png` provides social preview media for sharing (crawler-friendly image format).
 
 This gives a strong global discoverability baseline for both classic search and AI answer engines.
 

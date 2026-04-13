@@ -170,6 +170,31 @@ export const LandingBuilder: React.FC = () => {
   const selectAll = () => profile && setSelectedRepos(new Set(filteredRepos.map(p => p.name)));
   const selectNone = () => setSelectedRepos(new Set());
 
+  const copyUrlWithAlert = async (url: string) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      window.alert('Link copied');
+      return;
+    } catch {
+      // Fallback for environments where Clipboard API is unavailable.
+      const textArea = document.createElement('textarea');
+      textArea.value = url;
+      textArea.setAttribute('readonly', '');
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-9999px';
+      document.body.appendChild(textArea);
+      textArea.select();
+      try {
+        document.execCommand('copy');
+        window.alert('Link copied');
+      } catch {
+        window.alert('Link generated, but copy failed. Please copy manually.');
+      } finally {
+        document.body.removeChild(textArea);
+      }
+    }
+  };
+
   const handleDeploy = async () => {
     if (!profile || selectedRepos.size === 0) return;
     setDeploying(true);
@@ -188,11 +213,11 @@ export const LandingBuilder: React.FC = () => {
         card: themeOptions.cardStyle,
         text: themeOptions.textScale,
       });
-      setShortUrl(
-        await generateShortUrl(`${window.location.origin}/?${params}`, {
-          preferredDomain: selectedShortDomain || undefined,
-        })
-      );
+      const generatedUrl = await generateShortUrl(`${window.location.origin}/?${params}`, {
+        preferredDomain: selectedShortDomain || undefined,
+      });
+      setShortUrl(generatedUrl);
+      await copyUrlWithAlert(generatedUrl);
     } catch {
       setError('Deploy failed unexpectedly.');
     } finally {
@@ -742,18 +767,62 @@ export const LandingBuilder: React.FC = () => {
                   {shortUrl}
                 </a>
                 <button
-                  onClick={() => navigator.clipboard.writeText(shortUrl)}
+                  onClick={() => copyUrlWithAlert(shortUrl)}
                   style={{ background: 'rgba(255,255,255,0.05)', border: `1px solid ${C.border}`, borderRadius: '7px', padding: '6px', cursor: 'pointer', color: C.success, display: 'flex' }}
                 >
                   <Check style={{ width: '12px', height: '12px' }} />
                 </button>
               </div>
-              <button
-                onClick={() => setShortUrl('')}
-                style={{ marginTop: '10px', fontSize: '11px', color: C.muted, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', display: 'block' }}
-              >
-                Reset
-              </button>
+              <div style={{ marginTop: '10px', display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={handleDeploy}
+                  disabled={deploying || !profile || selectedRepos.size === 0}
+                  style={{
+                    flex: 1,
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    color: '#fff',
+                    background: `linear-gradient(135deg, ${C.accent}, #4f46e5)`,
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '8px 10px',
+                    cursor: deploying ? 'not-allowed' : 'pointer',
+                    opacity: deploying ? 0.6 : 1,
+                    fontFamily: 'inherit',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                  }}
+                >
+                  {deploying ? (
+                    <>
+                      <Loader2 style={{ width: '12px', height: '12px', animation: 'spin 1s linear infinite' }} />
+                      Updating...
+                    </>
+                  ) : (
+                    <>
+                      <Zap style={{ width: '12px', height: '12px' }} />
+                      Update Link
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => setShortUrl('')}
+                  style={{
+                    fontSize: '11px',
+                    color: C.muted,
+                    background: 'none',
+                    border: `1px solid ${C.border}`,
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    padding: '8px 10px',
+                  }}
+                >
+                  Reset
+                </button>
+              </div>
             </div>
           ) : (
             <button

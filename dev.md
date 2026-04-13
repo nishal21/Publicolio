@@ -30,6 +30,21 @@ Publicolio is a high-end, editorial-grade portfolio generator for developers. It
 
 ## Change Log
 
+### 2026-04-13 — Added Update Link Action In Deployed State
+- Added an `Update Link` button to the deployed-link panel so users can regenerate a link after editing theme/repo settings without clicking reset first.
+- Kept `Reset` as a secondary action and improved deployed-state controls for faster iteration.
+- Update action reuses existing deploy flow and auto-copy behavior.
+
+### 2026-04-13 — Social Link Preview Image Fix
+- Added a crawler-friendly Open Graph image at `public/og-cover.png` with `1200x630` dimensions.
+- Updated `index.html` social metadata to use PNG (`og:image` and `twitter:image`) instead of SVG for better platform compatibility.
+- Added explicit OG image metadata (`og:image:type`, width, height, alt, secure_url) to improve preview detection.
+
+### 2026-04-13 — Auto Copy URL On Deploy
+- Updated builder deploy flow so the generated portfolio URL is copied to clipboard automatically after clicking `Deploy Portfolio`.
+- Added success alert message: `Link copied` immediately after successful copy.
+- Wired the existing manual copy button to the same clipboard helper and added a fallback path for environments without Clipboard API support.
+
 ### 2026-04-13 — GitHub Pages Env Injection Fix (Variables or Secrets)
 - Diagnosed live fetch failure on `app.publicolio.qzz.io`: deployed bundle was missing `VITE_CORS_PROXY_URL`, causing GitHub profile fetch to fail in production.
 - Updated `.github/workflows/deploy-pages.yml` to read VITE values from either Actions Variables or Secrets.
