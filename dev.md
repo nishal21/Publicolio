@@ -30,6 +30,11 @@ Publicolio is a high-end, editorial-grade portfolio generator for developers. It
 
 ## Change Log
 
+### 2026-04-13 — Open Source Docs: License + Contributing
+- Added `LICENSE` with MIT license text (`Nishal K and contributors`).
+- Added `CONTRIBUTING.md` with setup, quality checks, branch/PR guidance, and issue reporting template.
+- Updated `package.json` with `"license": "MIT"` metadata.
+
 ### 2026-04-13 — README Updated For Cache + Update Link Behavior
 - Documented returning-user builder cache behavior (restored profile snapshot, selections, and generated short URL).
 - Documented `Update Link` flow and shortener backend requirement to preserve same code (`shortCode`/`code`/`slug`).
