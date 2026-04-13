@@ -1,50 +1,50 @@
 # Publicolio
 
-Publicolio is a zero-config GitHub portfolio generator.
-It lets you fetch a GitHub profile, select repositories, style the page with theme controls, and generate a shareable link.
+Publicolio is a zero-configuration GitHub portfolio generator.
+It lets you fetch profile data, curate repositories, apply visual themes, and publish a shareable portfolio URL in minutes.
 
-![Animated Demo](demo.gif)
+![Publicolio demo](demo.gif)
 
-## What It Does
+## Highlights
 
-- Fetches profile and repo data from GitHub.
-- Supports optional personal token input in builder mode for private/owner repos.
-- Provides 6 visual themes.
-- Provides editor controls for layout and styling.
-- Generates shareable portfolio URLs with selected repositories and style options encoded in query params.
-- Optionally shortens links through a Cloudflare Worker.
-- Supports short link domain choice between workers.dev and custom domain.
-- Caches builder state so returning users can continue editing after refresh.
-- Supports `Update Link` flow to keep the same short URL when the backend supports slug updates.
+- Fetches profile and repository data from GitHub.
+- Supports optional personal access token input in builder mode for private or owner-only repositories.
+- Includes 6 portfolio themes with live preview.
+- Exposes practical editor controls for layout, typography, card style, and accent color.
+- Encodes portfolio state into query parameters for deterministic sharing.
+- Supports optional short links through a Cloudflare Worker.
+- Supports short-link domain selection (`auto`, `workers.dev`, `custom`).
+- Caches builder state for returning users.
+- Supports `Update Link` flow to preserve the same short code when backend overwrite is supported.
 
-## How It Works
+## Runtime Model
 
-Publicolio has two runtime modes.
+Publicolio runs in two modes:
 
 1. Builder mode
-- If no `user` and `theme` query params are present, the app renders the interactive builder UI.
-- User enters GitHub username, picks repos, theme, and options, then clicks Deploy.
+- Activated when `user` and `theme` query params are not present.
+- Renders the interactive editor (`LandingBuilder`) to fetch data, choose repos, style output, and deploy links.
 
 2. Renderer mode
-- If `user` and `theme` query params exist, the app renders the final portfolio page directly.
-- The renderer fetches live GitHub data and filters repos based on the `repos` query param.
+- Activated when `user` and `theme` query params are present.
+- Renders the final portfolio page (`PortfolioRenderer`) directly from URL state.
 
-### Data Flow
+## End-to-End Flow
 
 1. Builder calls `fetchDeveloperData(username, token?)`.
-2. GitHub profile and repos are requested via proxy-aware fetch logic.
-3. Builder generates a long URL from selected options.
-4. Builder calls shortener endpoint (if configured).
+2. GitHub profile and repositories are fetched through proxy-aware network logic.
+3. Builder composes a long renderer URL from selected repositories and theme options.
+4. Builder sends URL to shortener endpoint (if configured).
 5. `Deploy Portfolio` creates a new short link.
-6. `Update Link` tries to preserve the same short code.
-7. If backend does not support same-code updates, UI shows a clear message instead of silently replacing with another code.
+6. `Update Link` requests same-code overwrite for an existing short URL.
+7. If backend does not support same-code overwrite, UI returns a clear update-unsupported message.
 8. If shortener fails, app falls back to the full long URL.
 
 ## Returning User Cache
 
-Builder state is cached in `localStorage` so users can continue from where they left off.
+Builder state is persisted in `localStorage`.
 
-Cached items:
+Cached:
 
 - Username
 - Selected theme
@@ -52,15 +52,16 @@ Cached items:
 - Short-link domain mode
 - Last generated short URL
 - Per-user repository selections
-- Cached profile snapshot for faster restore on refresh
+- Cached profile snapshot for faster restore
 
 Not cached:
 
-- GitHub token (excluded for safety)
+- GitHub token (intentionally excluded for safety)
 
 ## Themes and Controls
 
 Themes:
+
 - Aurora
 - Liquid Glass
 - Bento Grid
@@ -69,109 +70,36 @@ Themes:
 - Terminal
 
 Controls:
+
 - Show Avatar
 - Show Bio
 - Show Stats
-- Layout density: compact or comfortable
-- Repository sort: featured, stars, name
-- Card style: soft or sharp
-- Text scale: sm, md, lg
+- Layout density: `compact` or `comfortable`
+- Repository sort: `featured`, `stars`, `name`
+- Card style: `soft` or `sharp`
+- Text scale: `sm`, `md`, `lg`
 - Accent color
-- Short-link domain mode: auto, workers.dev, custom
+- Short-link domain mode: `auto`, `workers.dev`, `custom`
 
-## Stack
+## Technology Stack
 
 - React 19
 - TypeScript
 - Vite 8
 - Tailwind CSS 4
-- Lucide React icons
+- Lucide React
 
 ## Project Structure
 
-- `src/App.tsx`: mode switch between builder and renderer.
-- `src/components/LandingBuilder.tsx`: editor UI, fetch, selection, deploy flow.
-- `src/components/PortfolioRenderer.tsx`: final portfolio page loader.
-- `src/services/api.ts`: GitHub and shortener network logic.
-- `src/components/themes/*`: theme implementations.
+- `src/App.tsx` - mode switch between builder and renderer.
+- `src/components/LandingBuilder.tsx` - editor UI, fetch flow, repo selection, deploy/update actions.
+- `src/components/PortfolioRenderer.tsx` - final portfolio page runtime.
+- `src/services/api.ts` - GitHub and shortener network layer.
+- `src/components/themes/*` - theme implementations.
 
-## Environment Variables
+## Quick Start
 
-Create `.env` from `.env.example` and configure these values.
-
-| Variable | Required | Description |
-|---|---|---|
-| `VITE_CORS_PROXY_URL` | Yes | Proxy endpoint prefix for GitHub calls. Expected format: `https://your-proxy.workers.dev/?url=` |
-| `VITE_SHORTENER_URL` | Recommended | Primary shortener endpoint, usually `https://your-shortener.workers.dev/api/shorten` |
-| `VITE_SHORTENER_API_URL` | Optional | Backward-compatible alias for shortener endpoint |
-| `VITE_SHORTENER_WORKERS_DOMAIN` | Optional | Domain used when user selects `workers.dev` mode |
-| `VITE_SHORTENER_CUSTOM_DOMAIN` | Optional | Domain used when user selects `custom` mode |
-
-Notes:
-- `VITE_SHORTENER_URL` and `VITE_SHORTENER_API_URL` are both supported.
-- If shortener endpoint is missing or failing, deploy still returns a usable full URL.
-
-## Cloudflare Worker Contracts
-
-Reference implementations:
-
-- Shortener worker gist: [https://gist.github.com/nishal21/ba187199cd00ea6623b6cf4407e3a48d](https://gist.github.com/nishal21/ba187199cd00ea6623b6cf4407e3a48d)
-- CORS proxy repository: [https://github.com/nishal21/portfolio-cors-proxy](https://github.com/nishal21/portfolio-cors-proxy)
-
-### CORS Proxy Worker
-
-Expected request shape from frontend:
-
-- `GET {VITE_CORS_PROXY_URL}{encodeURIComponent(targetUrl)}` where proxy base ends with `?url=`
-- Optional request header from builder: `X-Custom-GitHub-Token`
-
-Expected behavior:
-
-- Returns `400` when `?url=` is missing.
-- For GitHub API targets, forwards either:
-  - user token from `X-Custom-GitHub-Token`, or
-  - fallback token from worker secret `GITHUB_TOKEN`.
-- Includes CORS headers that allow `X-Custom-GitHub-Token`.
-
-### Shortener Worker
-
-Expected endpoint:
-
-- `POST /api/shorten`
-
-Frontend payload sent:
-
-```json
-{
-  "longUrl": "https://...",
-  "url": "https://...",
-  "shortCode": "existing-code-when-updating",
-  "code": "existing-code-when-updating",
-  "slug": "existing-code-when-updating"
-}
-```
-
-Update-link behavior requirement:
-
-- To support `Update Link` without creating a new URL, worker must reuse the provided code and overwrite existing KV value.
-- If worker always generates random codes, frontend will show an explicit update-unsupported message.
-
-Frontend accepts response fields:
-
-- `shortUrl`
-- `shortened_url`
-- `short_url`
-- `url`
-
-Redirect behavior should be:
-
-- `GET /:code` -> HTTP 302 to original long URL
-
-KV requirement:
-
-- Bind KV namespace as `URL_DB` in the shortener worker.
-
-## Local Development
+Prerequisite: Node.js 20+
 
 1. Install dependencies.
 
@@ -179,7 +107,7 @@ KV requirement:
 npm install
 ```
 
-2. Create env file.
+2. Create local environment file.
 
 ```bash
 cp .env.example .env
@@ -191,38 +119,129 @@ PowerShell alternative:
 Copy-Item .env.example .env
 ```
 
-3. Start dev server.
+3. Start development server.
 
 ```bash
 npm run dev
 ```
 
-4. Build production bundle.
+4. Build for production.
 
 ```bash
 npm run build
 ```
 
-5. Preview production bundle locally.
+5. Preview production build locally.
 
 ```bash
 npm run preview
 ```
 
+## Environment Variables
+
+Create `.env` from `.env.example` and configure the following:
+
+| Variable | Required | Description |
+|---|---|---|
+| `VITE_CORS_PROXY_URL` | Yes | Proxy prefix for GitHub requests. Format: `https://your-proxy.workers.dev/?url=` |
+| `VITE_SHORTENER_URL` | Recommended | Primary shortener API endpoint, typically `https://your-shortener.workers.dev/api/shorten` |
+| `VITE_SHORTENER_API_URL` | Optional | Backward-compatible alias for shortener endpoint |
+| `VITE_SHORTENER_WORKERS_DOMAIN` | Optional | Domain used when short-link mode is `workers.dev` |
+| `VITE_SHORTENER_CUSTOM_DOMAIN` | Optional | Domain used when short-link mode is `custom` |
+
+Notes:
+
+- `VITE_SHORTENER_URL` and `VITE_SHORTENER_API_URL` are both supported.
+- If shortener config is missing or fails at runtime, deploy still returns a usable full URL.
+
+## Cloudflare Worker Contracts
+
+Reference implementations:
+
+- Shortener worker gist: [https://gist.github.com/nishal21/ba187199cd00ea6623b6cf4407e3a48d](https://gist.github.com/nishal21/ba187199cd00ea6623b6cf4407e3a48d)
+- CORS proxy repository: [https://github.com/nishal21/portfolio-cors-proxy](https://github.com/nishal21/portfolio-cors-proxy)
+
+### CORS Proxy Worker Contract
+
+Expected frontend request:
+
+- `GET {VITE_CORS_PROXY_URL}{encodeURIComponent(targetUrl)}` where proxy base ends with `?url=`
+- Optional request header: `X-Custom-GitHub-Token`
+
+Expected proxy behavior:
+
+- Returns `400` when `?url=` is missing.
+- For GitHub API targets, forwards either:
+  - user token from `X-Custom-GitHub-Token`, or
+  - worker secret `GITHUB_TOKEN`.
+- Includes CORS headers allowing `X-Custom-GitHub-Token`.
+
+### Shortener Worker Contract
+
+Expected endpoint:
+
+- `POST /api/shorten`
+
+Frontend payload:
+
+```json
+{
+  "longUrl": "https://...",
+  "url": "https://...",
+  "shortCode": "existing-code-when-updating",
+  "code": "existing-code-when-updating",
+  "slug": "existing-code-when-updating"
+}
+```
+
+Update-link requirement:
+
+- To support `Update Link` without changing URL, worker must reuse provided code and overwrite existing KV value.
+- If worker always generates random codes, frontend will show an explicit update-unsupported message.
+
+Accepted response fields:
+
+- `shortUrl`
+- `shortened_url`
+- `short_url`
+- `url`
+
+Redirect behavior:
+
+- `GET /:code` returns HTTP `302` to original long URL.
+
+KV binding:
+
+- Bind KV namespace as `URL_DB`.
+
+## URL Parameters (Renderer)
+
+- `user`: GitHub username
+- `theme`: theme key
+- `repos`: comma-separated repository names
+- `stats`: `1` or `0`
+- `avatar`: `1` or `0`
+- `bio`: `1` or `0`
+- `accent`: hex color without `#`
+- `layout`: `compact` or `comfortable`
+- `sort`: `featured`, `stars`, or `name`
+- `card`: `soft` or `sharp`
+- `text`: `sm`, `md`, or `lg`
+
 ## Deployment
 
-Publicolio is a static frontend and can be deployed to any static host.
+Publicolio is a static frontend and can be deployed on any static host.
 
-Required for production:
+Production checklist:
 
-1. Set all required VITE env vars in your hosting provider.
-2. Ensure CORS proxy worker is deployed and reachable.
-3. Ensure shortener worker is deployed and reachable.
-4. Ensure custom short-link domain points to shortener worker if using custom mode.
+1. Configure required VITE variables on your hosting platform.
+2. Deploy and verify CORS proxy worker.
+3. Deploy and verify shortener worker.
+4. Point custom short-link domain to shortener worker if using `custom` mode.
 
-## GitHub Auto Deploy (Included)
+### GitHub Actions Auto Deploy
 
-This repository now includes a GitHub Actions workflow:
+Included workflow:
 
 - `.github/workflows/deploy-pages.yml`
 
@@ -230,10 +249,10 @@ Workflow behavior:
 
 1. Runs on every push to `main`.
 2. Installs dependencies and builds the Vite app.
-3. Uploads `dist/` as a GitHub Pages artifact.
+3. Uploads `dist/` as a Pages artifact.
 4. Deploys automatically to GitHub Pages.
 
-Build-time environment values are read from repository variables:
+Build-time env values are read from GitHub Actions Variables (preferred) and also supported via Secrets:
 
 - `VITE_CORS_PROXY_URL`
 - `VITE_SHORTENER_URL`
@@ -241,98 +260,76 @@ Build-time environment values are read from repository variables:
 - `VITE_SHORTENER_WORKERS_DOMAIN`
 - `VITE_SHORTENER_CUSTOM_DOMAIN`
 
-Set these in:
+## Domain Setup Template
 
-- GitHub repo -> Settings -> Secrets and variables -> Actions
-  - Preferred: Variables
-  - Also supported: Secrets (same key names)
+Recommended hostname split:
 
-## Domain Setup (Template)
+- Shortener: `short.example.com`
+- App: `app.example.com`
 
-If your shortener uses one hostname, keep the main app on a different subdomain.
+### GitHub Pages Custom Domain
 
-- Shortener domain (example): `short.example.com`
-- Main app domain (example): `app.example.com`
-
-### GitHub Pages Custom Domain Setup
-
-1. In GitHub repo Settings -> Pages, set Source to `GitHub Actions`.
-2. In Pages -> Custom domain, set `app.example.com`.
-3. Enable `Enforce HTTPS` after DNS is verified.
-4. In your DNS dashboard, add:
-  - Type: `CNAME`
-  - Name: `app`
-  - Target: `username.github.io`
-5. Keep `public/CNAME` in this repo as `app.example.com`.
+1. In repository Settings -> Pages, set Source to `GitHub Actions`.
+2. Set custom domain to `app.example.com`.
+3. Enable HTTPS after DNS verification.
+4. Add DNS record:
+   - Type: `CNAME`
+   - Name: `app`
+   - Target: `username.github.io`
+5. Keep `public/CNAME` aligned with your custom app domain.
 
 Important:
 
-- DNS target must be `nishal21.github.io` only (no `/Publicolio` path).
-- Paths are not valid in CNAME targets.
+- DNS target must be host-only (`username.github.io`), not a URL path.
 
-### If You Keep Default GitHub URL
+If using default project URL:
 
-- Without custom domain, site URL is `https://nishal21.github.io/Publicolio/`.
-- No DNS change is needed for this mode.
-- With custom domain enabled, your primary URL becomes `https://app.example.com/`.
+- `https://nishal21.github.io/Publicolio/`
 
-### GitHub Hosting Notes
+## SEO and GEO Baseline
 
-- If hosted at root domain, generated long links work out of the box.
-- If hosted under a subpath, verify generated links include your base path.
-- A custom domain for the shortener can still be used independently.
+Included assets and metadata:
 
-## SEO and GEO Baseline (Included)
-
-The project now ships with technical SEO and GEO essentials:
-
-- `index.html` includes canonical, robots directives, Open Graph, Twitter tags, global geo tags, and JSON-LD structured data.
-- `public/robots.txt` includes sitemap reference and explicit allowance for key AI crawlers.
-- `public/sitemap.xml` includes your canonical homepage URL.
-- `public/llms.txt` provides machine-readable guidance for LLM crawlers and AI search tools.
-- `public/og-cover.png` provides social preview media for sharing (crawler-friendly image format).
-
-This gives a strong global discoverability baseline for both classic search and AI answer engines.
-
-## URL Parameters Used by Renderer
-
-- `user`: GitHub username
-- `theme`: theme key
-- `repos`: comma-separated repo names
-- `stats`: `1` or `0`
-- `avatar`: `1` or `0`
-- `bio`: `1` or `0`
-- `accent`: hex without `#`
-- `layout`: `compact` or `comfortable`
-- `sort`: `featured`, `stars`, or `name`
-- `card`: `soft` or `sharp`
-- `text`: `sm`, `md`, or `lg`
+- `index.html` with canonical, robots directives, Open Graph, Twitter tags, geo tags, and JSON-LD.
+- `public/robots.txt` with sitemap reference and crawler directives.
+- `public/sitemap.xml` with canonical homepage URL.
+- `public/llms.txt` for AI/LLM crawler guidance.
+- `public/og-cover.png` for robust social previews.
 
 ## Troubleshooting
 
-`Deploy failed` or no short link:
+### Deploy Fails or No Short Link
 
-1. Check shortener endpoint URL in env.
-2. Check worker route includes `/api/shorten`.
-3. Check worker accepts `longUrl` payload.
-4. Check browser network tab for CORS/400/500 responses.
-5. If shortener fails, copy and use the full fallback URL shown by the app.
+1. Verify shortener endpoint env value.
+2. Verify worker route includes `/api/shorten`.
+3. Verify worker accepts `longUrl` payload.
+4. Check browser network errors (CORS, 400, 500).
+5. Use fallback full URL if shortener is unavailable.
 
-`Update Link` does not keep same short URL:
+### Update Link Does Not Preserve Code
 
-1. Ensure worker accepts `shortCode` / `code` / `slug` fields.
-2. Ensure worker overwrites existing KV mapping for that code.
-3. Ensure worker redirect path returns `302 Location: <updated-long-url>`.
-4. If you still see update-unsupported message, backend is returning a different code.
+1. Ensure worker accepts `shortCode`, `code`, or `slug`.
+2. Ensure worker overwrites KV mapping for existing code.
+3. Ensure redirect endpoint returns `302` with updated destination.
+4. If frontend shows update-unsupported, backend returned a different code.
 
-GitHub fetch issues:
+### GitHub Fetch Issues
 
-1. Verify `VITE_CORS_PROXY_URL` is valid.
-2. Verify proxy worker forwards GitHub API status and body.
-3. For private repos, provide a valid personal token in builder UI.
+1. Verify `VITE_CORS_PROXY_URL`.
+2. Verify proxy forwards GitHub status and response body.
+3. For private repos, provide a valid token in builder mode.
 
-## 🧑‍💻 Author
-Created by **Nishal K** (Malappuram, Kerala).
+## Contributing
+
+Please review [CONTRIBUTING.md](CONTRIBUTING.md) for setup, quality checks, and pull request guidelines.
+
+## License
+
+Licensed under the MIT License. See [LICENSE](LICENSE).
+
+## Author
+
+Created by Nishal K.
 
 - GitHub: [@nishal21](https://github.com/nishal21)
 - Instagram: [@demonking.___](https://instagram.com/demonking.___)

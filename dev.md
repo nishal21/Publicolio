@@ -30,6 +30,11 @@ Publicolio is a high-end, editorial-grade portfolio generator for developers. It
 
 ## Change Log
 
+### 2026-04-13 — README Professional Documentation Pass
+- Rewrote `README.md` into a production-grade open-source format with clearer structure and wording.
+- Added cleaner sections for runtime model, end-to-end flow, deployment checklist, and operations contracts.
+- Improved discoverability by adding direct Contributing and License sections at the end of the README.
+
 ### 2026-04-13 — Open Source Docs: License + Contributing
 - Added `LICENSE` with MIT license text (`Nishal K and contributors`).
 - Added `CONTRIBUTING.md` with setup, quality checks, branch/PR guidance, and issue reporting template.
