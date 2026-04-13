@@ -1,0 +1,16 @@
+# Publicolio
+> Publicolio is a zero-config GitHub portfolio generator that turns developer profiles into shareable portfolio pages with design themes and deploy links.
+
+## Main pages
+- [Home](https://app.publicolio.qzz.io/): Main app entry for portfolio generation and deployment.
+
+## Key capabilities
+- GitHub profile and repository fetching through a CORS proxy
+- Optional builder-only token support for owner/private repository access
+- Multiple portfolio themes and editor controls
+- Shareable URLs with theme and repository selection
+- Optional short-link generation with custom domain support
+
+## References
+- [CORS Proxy](https://github.com/nishal21/portfolio-cors-proxy): Worker used to proxy GitHub API calls.
+- [Shortener Worker Gist](https://gist.github.com/nishal21/ba187199cd00ea6623b6cf4407e3a48d): Worker used for short link creation and redirects.

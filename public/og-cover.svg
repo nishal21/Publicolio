@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="Publicolio social preview">
+  <defs>
+    <linearGradient id="bg" x1="100" y1="40" x2="1080" y2="580" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0f172a" />
+      <stop offset="0.5" stop-color="#1e1b4b" />
+      <stop offset="1" stop-color="#111827" />
+    </linearGradient>
+    <linearGradient id="glow" x1="240" y1="100" x2="980" y2="520" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#22d3ee" stop-opacity="0.35" />
+      <stop offset="1" stop-color="#6366f1" stop-opacity="0.35" />
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)" />
+  <rect width="1200" height="630" fill="url(#glow)" />
+
+  <rect x="120" y="112" width="960" height="406" rx="32" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.12)" />
+
+  <text x="170" y="255" fill="#eef2ff" font-size="78" font-family="Inter, Segoe UI, Arial, sans-serif" font-weight="800">
+    Publicolio
+  </text>
+  <text x="170" y="322" fill="#cbd5e1" font-size="34" font-family="Inter, Segoe UI, Arial, sans-serif" font-weight="500">
+    Build a premium portfolio from your GitHub profile
+  </text>
+  <text x="170" y="382" fill="#a5b4fc" font-size="28" font-family="Inter, Segoe UI, Arial, sans-serif" font-weight="600">
+    Themes • Repo Selection • Short Links • One Deploy Flow
+  </text>
+
+  <circle cx="955" cy="208" r="64" fill="#8b5cf6" opacity="0.18" />
+  <circle cx="1005" cy="288" r="84" fill="#22d3ee" opacity="0.14" />
+  <circle cx="910" cy="350" r="60" fill="#6366f1" opacity="0.2" />
+
+  <text x="170" y="454" fill="#94a3b8" font-size="24" font-family="Inter, Segoe UI, Arial, sans-serif" font-weight="500">
+    app.publicolio.qzz.io
+  </text>
+</svg>
