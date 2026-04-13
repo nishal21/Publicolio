@@ -12,6 +12,8 @@ It lets you fetch a GitHub profile, select repositories, style the page with the
 - Generates shareable portfolio URLs with selected repositories and style options encoded in query params.
 - Optionally shortens links through a Cloudflare Worker.
 - Supports short link domain choice between workers.dev and custom domain.
+- Caches builder state so returning users can continue editing after refresh.
+- Supports `Update Link` flow to keep the same short URL when the backend supports slug updates.
 
 ## How It Works
 
@@ -31,8 +33,28 @@ Publicolio has two runtime modes.
 2. GitHub profile and repos are requested via proxy-aware fetch logic.
 3. Builder generates a long URL from selected options.
 4. Builder calls shortener endpoint (if configured).
-5. If shortener succeeds, short URL is shown.
-6. If shortener fails, app falls back to the full long URL.
+5. `Deploy Portfolio` creates a new short link.
+6. `Update Link` tries to preserve the same short code.
+7. If backend does not support same-code updates, UI shows a clear message instead of silently replacing with another code.
+8. If shortener fails, app falls back to the full long URL.
+
+## Returning User Cache
+
+Builder state is cached in `localStorage` so users can continue from where they left off.
+
+Cached items:
+
+- Username
+- Selected theme
+- Theme options
+- Short-link domain mode
+- Last generated short URL
+- Per-user repository selections
+- Cached profile snapshot for faster restore on refresh
+
+Not cached:
+
+- GitHub token (excluded for safety)
 
 ## Themes and Controls
 
@@ -120,9 +142,17 @@ Frontend payload sent:
 ```json
 {
   "longUrl": "https://...",
-  "url": "https://..."
+  "url": "https://...",
+  "shortCode": "existing-code-when-updating",
+  "code": "existing-code-when-updating",
+  "slug": "existing-code-when-updating"
 }
 ```
+
+Update-link behavior requirement:
+
+- To support `Update Link` without creating a new URL, worker must reuse the provided code and overwrite existing KV value.
+- If worker always generates random codes, frontend will show an explicit update-unsupported message.
 
 Frontend accepts response fields:
 
@@ -230,7 +260,7 @@ If your shortener uses one hostname, keep the main app on a different subdomain.
 4. In your DNS dashboard, add:
   - Type: `CNAME`
   - Name: `app`
-  - Target: `username.github.io/repo-name`
+  - Target: `username.github.io`
 5. Keep `public/CNAME` in this repo as `app.example.com`.
 
 Important:
@@ -285,6 +315,13 @@ This gives a strong global discoverability baseline for both classic search and 
 3. Check worker accepts `longUrl` payload.
 4. Check browser network tab for CORS/400/500 responses.
 5. If shortener fails, copy and use the full fallback URL shown by the app.
+
+`Update Link` does not keep same short URL:
+
+1. Ensure worker accepts `shortCode` / `code` / `slug` fields.
+2. Ensure worker overwrites existing KV mapping for that code.
+3. Ensure worker redirect path returns `302 Location: <updated-long-url>`.
+4. If you still see update-unsupported message, backend is returning a different code.
 
 GitHub fetch issues:
 

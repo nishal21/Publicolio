@@ -30,6 +30,12 @@ Publicolio is a high-end, editorial-grade portfolio generator for developers. It
 
 ## Change Log
 
+### 2026-04-13 — README Updated For Cache + Update Link Behavior
+- Documented returning-user builder cache behavior (restored profile snapshot, selections, and generated short URL).
+- Documented `Update Link` flow and shortener backend requirement to preserve same code (`shortCode`/`code`/`slug`).
+- Added troubleshooting guidance for update-link cases where backend still returns a different slug.
+- Corrected DNS custom-domain target example to host-only (`username.github.io`).
+
 ### 2026-04-13 — Same-Link Update Flow With Backend Capability Check
 - Updated deploy service to support `preserveSlug` mode when user clicks `Update Link`.
 - Frontend now sends existing short code hints (`shortCode`, `code`, `slug`) to shortener worker during update.
