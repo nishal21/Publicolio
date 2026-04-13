@@ -30,6 +30,12 @@ Publicolio is a high-end, editorial-grade portfolio generator for developers. It
 
 ## Change Log
 
+### 2026-04-13 — GitHub Pages Env Injection Fix (Variables or Secrets)
+- Diagnosed live fetch failure on `app.publicolio.qzz.io`: deployed bundle was missing `VITE_CORS_PROXY_URL`, causing GitHub profile fetch to fail in production.
+- Updated `.github/workflows/deploy-pages.yml` to read VITE values from either Actions Variables or Secrets.
+- Added workflow guard step to fail fast when `VITE_CORS_PROXY_URL` is empty, preventing silent broken deployments.
+- Updated README deployment notes to mention both Variables and Secrets are supported.
+
 ### 2026-04-13 — GitHub Repository Initialized and Pushed
 - Initialized local git repository with `main` branch and pushed project to `https://github.com/nishal21/Publicolio.git`.
 - Added `.env` and `.env.*` to `.gitignore`, kept `.env.example` tracked, and removed local `.env` from version control before push.

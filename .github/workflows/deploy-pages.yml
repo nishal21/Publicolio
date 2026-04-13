@@ -19,14 +19,21 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      VITE_CORS_PROXY_URL: ${{ vars.VITE_CORS_PROXY_URL }}
-      VITE_SHORTENER_URL: ${{ vars.VITE_SHORTENER_URL }}
-      VITE_SHORTENER_API_URL: ${{ vars.VITE_SHORTENER_API_URL }}
-      VITE_SHORTENER_WORKERS_DOMAIN: ${{ vars.VITE_SHORTENER_WORKERS_DOMAIN }}
-      VITE_SHORTENER_CUSTOM_DOMAIN: ${{ vars.VITE_SHORTENER_CUSTOM_DOMAIN }}
+      VITE_CORS_PROXY_URL: ${{ vars.VITE_CORS_PROXY_URL || secrets.VITE_CORS_PROXY_URL }}
+      VITE_SHORTENER_URL: ${{ vars.VITE_SHORTENER_URL || secrets.VITE_SHORTENER_URL }}
+      VITE_SHORTENER_API_URL: ${{ vars.VITE_SHORTENER_API_URL || secrets.VITE_SHORTENER_API_URL }}
+      VITE_SHORTENER_WORKERS_DOMAIN: ${{ vars.VITE_SHORTENER_WORKERS_DOMAIN || secrets.VITE_SHORTENER_WORKERS_DOMAIN }}
+      VITE_SHORTENER_CUSTOM_DOMAIN: ${{ vars.VITE_SHORTENER_CUSTOM_DOMAIN || secrets.VITE_SHORTENER_CUSTOM_DOMAIN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Validate required env
+        run: |
+          if [ -z "$VITE_CORS_PROXY_URL" ]; then
+            echo "::error::VITE_CORS_PROXY_URL is empty. Add it in Actions Variables or Secrets."
+            exit 1
+          fi
 
       - name: Setup Node
         uses: actions/setup-node@v4

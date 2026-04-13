@@ -211,7 +211,9 @@ Build-time environment values are read from repository variables:
 
 Set these in:
 
-- GitHub repo -> Settings -> Secrets and variables -> Actions -> Variables
+- GitHub repo -> Settings -> Secrets and variables -> Actions
+  - Preferred: Variables
+  - Also supported: Secrets (same key names)
 
 ## Domain Setup (Template)
 
